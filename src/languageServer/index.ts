@@ -1,3 +1,4 @@
+import * as path from "path";
 import * as vscode from "vscode";
 import {
   LanguageClient,
@@ -7,6 +8,8 @@ import {
 
 import { buildConfigPreview, ConfigPreview } from "./utils/buildConfigPreview";
 import { buildDagPreview } from "./utils/buildDagPreview";
+import { buildMetroMapPreview } from "./utils/buildMetroMapPreview";
+import { generateMetroMap } from "./utils/generateMetroMap";
 import {
   fetchLanguageServerJar,
   fetchLanguageServerNative,
@@ -64,6 +67,12 @@ function startLanguageServer() {
           ],
           synchronize: {
             configurationSection: "nextflow"
+          },
+          middleware: {
+            async provideCodeLenses(document, token, next) {
+              const lenses = await next(document, token);
+              return lenses?.map(toMetroMapLens);
+            }
           },
           uriConverters: {
             code2Protocol: (value: vscode.Uri) => {
@@ -123,6 +132,98 @@ function startLanguageServer() {
       });
     }
   );
+}
+
+/**
+ * Replaces the "Preview DAG" lens of the entry workflow, whose name is null,
+ * with "Preview metro-map". bioflow-insight can only map a script from its
+ * entry workflow, so the named workflows keep their DAG preview.
+ */
+function toMetroMapLens(lens: vscode.CodeLens): vscode.CodeLens {
+  const command = lens.command;
+  if (command?.command !== "nextflow.previewDag" || command.arguments?.[1]) {
+    return lens;
+  }
+  lens.command = {
+    title: "Preview metro-map",
+    command: "nextflow.previewMetroMap",
+    arguments: [command.arguments?.[0]]
+  };
+  return lens;
+}
+
+/**
+ * Shows the MetroFlow metro map of the entry workflow, or its Mermaid DAG
+ * when the metro map cannot be generated.
+ */
+async function previewMetroMap(context: vscode.ExtensionContext, uri: string) {
+  try {
+    await showMetroMap(context, uri);
+  } catch (e) {
+    vscode.window.showWarningMessage(
+      `Could not generate the metro map, showing the DAG instead: ${e instanceof Error ? e.message : e}`
+    );
+    await previewDag(context, uri);
+  }
+}
+
+async function showMetroMap(context: vscode.ExtensionContext, uri: string) {
+  const mediaPath = vscode.Uri.joinPath(context.extensionUri, "media");
+  const workflowPath = vscode.Uri.parse(uri).fsPath;
+  const data = await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: "Generating the metro map..."
+    },
+    () => generateMetroMap(context, workflowPath)
+  );
+  const panel = vscode.window.createWebviewPanel(
+    "metro-map-preview",
+    "Metro Map",
+    vscode.ViewColumn.Beside,
+    {
+      enableScripts: true,
+      localResourceRoots: [mediaPath],
+      // the panel keeps its layout while it is hidden
+      retainContextWhenHidden: true
+    }
+  );
+  const listener = panel.webview.onDidReceiveMessage((message) =>
+    handleMetroMapMessage(message, workflowPath)
+  );
+  panel.onDidDispose(() => listener.dispose());
+  panel.webview.html = buildMetroMapPreview(data, panel.webview, mediaPath);
+}
+
+/** What the metro map asks the extension, because a webview cannot do it. */
+async function handleMetroMapMessage(message: any, workflowPath: string) {
+  switch (message?.type) {
+    case "saveFile": {
+      const target = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.file(
+          path.join(path.dirname(workflowPath), message.filename)
+        )
+      });
+      if (!target) {
+        return;
+      }
+      await vscode.workspace.fs.writeFile(
+        target,
+        Buffer.from(message.data, "base64")
+      );
+      vscode.window.showInformationMessage(`Saved ${target.fsPath}`);
+      return;
+    }
+    case "toggleFullscreen":
+      // the webview has focus, so this maximizes the metro map's editor group
+      await vscode.commands.executeCommand(
+        "workbench.action.toggleMaximizeEditorGroup"
+      );
+      return;
+    case "notify":
+      vscode.window.showInformationMessage(String(message.message));
+      return;
+  }
 }
 
 async function previewDag(
@@ -285,6 +386,9 @@ export function activateLanguageServer(
   );
   vscode.commands.registerCommand("nextflow.previewDag", (uri, name) => {
     previewDag(context, uri, name);
+  });
+  vscode.commands.registerCommand("nextflow.previewMetroMap", (uri) => {
+    previewMetroMap(context, uri);
   });
   vscode.commands.registerCommand(
     "nextflow.previewConfig",

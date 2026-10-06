@@ -1,9 +1,21 @@
 const { build } = require("esbuild");
 const { copy } = require("esbuild-plugin-copy");
+const fs = require("fs");
 
 const production = process.argv.includes("--production");
 
 async function main() {
+  for (const file of [
+    "metroflow/metro_map.js",
+    "bioflow-insight/src/workflow.py"
+  ]) {
+    if (!fs.existsSync(file)) {
+      throw new Error(
+        `The ${file.split("/")[0]} submodule is missing, run: git submodule update --init`
+      );
+    }
+  }
+
   const files = {
     "images/**": "./images",
     "snippets/**": "./snippets",
@@ -13,7 +25,17 @@ async function main() {
     "README.md": "./README.md",
     "language-configuration.json": "./language-configuration.json",
     "package.json": "./package.json",
-    "node_modules/mermaid/dist/mermaid.min.js": "media"
+    "node_modules/mermaid/dist/mermaid.min.js": "media",
+    "metroflow/*.js": "./media/metroflow",
+    "metroflow/LICENSE": "./media/metroflow",
+    "scripts/generate_metro_map.py": "./media/metroflow",
+    // bioflow-insight's package is named `src`
+    "bioflow-insight/src/**/*.{py,jar}": "./media/bioflow-insight/src",
+    "bioflow-insight/{LICENSE,requirements.txt}": "./media/bioflow-insight",
+    "node_modules/d3/dist/d3.min.js": "media",
+    "node_modules/prismjs/components/prism-{core,clike,groovy,python}.min.js":
+      "media/prism",
+    "node_modules/prismjs/themes/prism-tomorrow.min.css": "media/prism"
   };
 
   // The webview: a browser bundle, built from its own tsconfig so that the

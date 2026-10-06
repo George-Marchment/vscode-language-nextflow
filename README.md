@@ -18,6 +18,7 @@ The extension uses the [Nextflow language server](https://github.com/nextflow-io
 - Hover hints
 - Rename
 - DAG preview for workflows
+- [Metro map preview](#metro-map-preview) for the entry workflow
 - Config preview for processes
 
 Read the [Nextflow documentation](https://nextflow.io/docs/latest/vscode.html) for more information about the Nextflow language server.
@@ -26,6 +27,28 @@ Related blog posts:
 
 - [Modernizing the Nextflow Developer Experience (Part 1): The IDE](https://seqera.io/blog/modernizing-nextflow-developer-experience/)
 - [Modernizing the Nextflow Developer Experience (Part 2): The Language Server](https://seqera.io/blog/modernizing-nextflow-developer-experience-part-2/)
+
+### Metro map preview
+
+**Preview metro-map**, above the entry workflow of a script, shows the pipeline as an interactive metro map, drawn by [MetroFlow](https://gitlab.pasteur.fr/sharefair/metroflow) from the structure extracted by [BioFlow-Insight](https://gitlab.liris.cnrs.fr/sharefair/bioflow-insight) (using the Nextflow language-server). Each process is a station, and the channels that connect the processes are the lines between them.
+
+
+![Metro map of a Nextflow workflow](images/metro-map-overview-white.png)
+
+The metro map allows you to:
+
+- See the code and the condition of a process by right-clicking on its station
+- Collapse a subworkflow into a single station by double-clicking on it, and right-click on it to see its code, its condition and what it contains
+- Highlight the paths that go through a process
+- Follow conditional branches: edges that share a condition have the same color
+- Rearrange the map by moving the stations, then download, upload or reset the layout
+- Change the appearance
+- Export the map as SVG or PNG
+- Show the map fullscreen
+
+The map follows the colors of your VS Code theme. The metro map is only available for the entry workflow, because BioFlow-Insight builds the map of a pipeline from its entry point: named workflows (subworkflows) keep **Preview DAG**. When the metro map cannot be generated, the DAG of the entry workflow is shown instead, with a warning that explains why.
+
+![Metro map features](images/metro-map-overview-black.png)
 
 ### Project view
 
@@ -56,6 +79,18 @@ This extension is available in the [Visual Studio Marketplace](https://marketpla
 The language server requires Java 17 or later.
 
 _Note: for custom Java installations such as conda, you might need to set the `nextflow.java.home` extension setting for the extension to find your Java installation._
+
+The [metro map preview](#metro-map-preview) also requires:
+
+- Python 3.8 or later, with the Python dependencies of BioFlow-Insight:
+
+  ```bash
+  pip install graphviz jpype1 networkx numpy pandas parsimonious sympy
+  ```
+
+- [Graphviz](https://graphviz.org/download/) on the `PATH`
+
+BioFlow-Insight and MetroFlow themselves are bundled with the extension, so they don't need to be installed. Set the `nextflow.metroflow.pythonPath` extension setting if the extension should use a Python other than `python3`, such as one from a virtual environment or conda. Without these requirements, **Preview metro-map** shows the DAG instead.
 
 ### Offline usage
 
@@ -107,6 +142,8 @@ The following settings are available:
 - `nextflow.log.filter.hiddenLevels`: Log levels to hide in `.nextflow.log` files when filtering is enabled. The file on disk is unchanged. Can be toggled per-file in the editor title bar.
 
 - `nextflow.log.filter.stripAnsi`: Remove ANSI escape codes (e.g. `\u001b[0;32m`) from `.nextflow.log` files when filtering is enabled. The file on disk is unchanged. Can be toggled per-file in the editor title bar.
+
+- `nextflow.metroflow.pythonPath`: Python interpreter used to generate the [metro map](#metro-map-preview). It must have the Python dependencies of BioFlow-Insight installed (default: `python3`).
 
 - `nextflow.telemetry.enabled`: Enable usage data to be sent to Seqera. See [below](#telemetry-notice) for more information about what we do and do not collect.
 

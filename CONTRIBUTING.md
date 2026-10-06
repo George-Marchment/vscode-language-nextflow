@@ -7,9 +7,11 @@ Contributions are welcome. Fork [this repository](https://github.com/nextflow-io
 Clone this repository:
 
 ```bash
-git clone https://github.com/nextflow-io/vscode-language-nextflow
+git clone --recurse-submodules https://github.com/nextflow-io/vscode-language-nextflow
 cd vscode-language-nextflow
 ```
+
+The [MetroFlow](https://gitlab.pasteur.fr/sharefair/metroflow) metro map viewer and [BioFlow-Insight](https://gitlab.liris.cnrs.fr/sharefair/bioflow-insight), which generates the metro map, are git submodules that are bundled with the extension. In an existing clone, fetch them with `git submodule update --init`, and update them to their latest versions with `git submodule update --remote metroflow bioflow-insight`.
 
 Install dependencies:
 

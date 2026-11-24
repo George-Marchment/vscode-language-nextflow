@@ -1,86 +1,62 @@
 import * as vscode from "vscode";
-import { execFile } from "child_process";
-import * as fs from "fs/promises";
-import * as os from "os";
-import * as path from "path";
 
-/** Exit code of generate_metro_map.py when bioflow-insight cannot be imported. */
-const EXIT_NOT_INSTALLED = 2;
+import {
+  buildMetroMap,
+  StructureCache,
+  type MetroMapResult,
+  type ScriptStructure
+} from "./metroMap";
 
-function installHint(requirements: string) {
-  return `Install BioFlow-Insight's Python dependencies (\`pip install -r ${requirements}\`) and Graphviz, or point the \`nextflow.metroflow.pythonPath\` setting to a Python that has them.`;
+/** The language server command that returns the structure of a script. */
+const PREVIEW_DAG_JSON = "nextflow.server.previewDagJson";
+
+/** The same URI as the editor spells it. */
+export const normalizeUri = (uri: string) => vscode.Uri.parse(uri).toString();
+
+/**
+ * The structures of the scripts, kept until they change: building a map
+ * again (another workflow, an update) only asks the language server for the
+ * scripts that changed.
+ */
+const cache = new StructureCache(async (scriptUri) => {
+  const res: any = await vscode.commands.executeCommand(
+    PREVIEW_DAG_JSON,
+    scriptUri
+  );
+  if (!res?.result) {
+    const file = vscode.workspace.asRelativePath(vscode.Uri.parse(scriptUri));
+    throw new Error(
+      `${file}: ${res?.error ?? "the language server did not return its structure."}`
+    );
+  }
+  return res.result as ScriptStructure;
+}, normalizeUri);
+
+/** Forgets the structure of a script that changed. */
+export function invalidateMetroMapScript(uri: vscode.Uri) {
+  cache.invalidate(uri.toString());
+}
+
+/** Forgets all the structures, e.g. when the language server restarts. */
+export function clearMetroMapCache() {
+  cache.clear();
 }
 
 /**
- * Generates the MetroFlow metro map of a workflow with bioflow-insight, whose
- * structure comes from the Nextflow language server. Rejects with a message
- * that can be shown to the user.
+ * Generates the MetroFlow metro map of the entry workflow of a script, or of
+ * one of its named workflows, from the structure of its scripts that the
+ * Nextflow language server extracts. Rejects with a message that can be
+ * shown to the user.
  */
 export async function generateMetroMap(
-  context: vscode.ExtensionContext,
-  workflowPath: string
-): Promise<object> {
-  const pythonPath =
-    vscode.workspace
-      .getConfiguration("nextflow")
-      .get<string>("metroflow.pythonPath") || "python3";
-  const mediaPath = vscode.Uri.joinPath(context.extensionUri, "media");
-  const script = vscode.Uri.joinPath(
-    mediaPath,
-    "metroflow",
-    "generate_metro_map.py"
-  ).fsPath;
-  // the bioflow-insight bundled with the extension, rather than an installed one
-  const bioflowInsightPath = vscode.Uri.joinPath(
-    mediaPath,
-    "bioflow-insight"
-  ).fsPath;
-  const hint = installHint(path.join(bioflowInsightPath, "requirements.txt"));
-  const env = {
-    ...process.env,
-    PYTHONPATH: [bioflowInsightPath, process.env.PYTHONPATH]
-      .filter(Boolean)
-      .join(path.delimiter)
-  };
-  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "metroflow-"));
-  try {
-    const jsonPath = await new Promise<string>((resolve, reject) => {
-      execFile(
-        pythonPath,
-        [script, workflowPath, outputDir],
-        // the language server runs in a JVM started by the script
-        { cwd: path.dirname(workflowPath), env, timeout: 120_000 },
-        (error, stdout, stderr) => {
-          if (!error) {
-            resolve(stdout.trim().split("\n").pop()!);
-            return;
-          }
-          if (stderr) {
-            console.error(stderr);
-          }
-          // the exit code, or a string such as ENOENT when Python cannot be run
-          const code: unknown = (error as { code?: unknown }).code;
-          if (code === "ENOENT") {
-            reject(
-              new Error(`Python was not found (\`${pythonPath}\`). ${hint}`)
-            );
-          } else if (code === EXIT_NOT_INSTALLED) {
-            reject(
-              new Error(
-                `BioFlow-Insight's Python dependencies are missing. ${hint}`
-              )
-            );
-          } else if (error.killed) {
-            reject(new Error("Generating the metro map timed out."));
-          } else {
-            const lines = stderr.trim().split("\n");
-            reject(new Error(lines[lines.length - 1] || error.message));
-          }
-        }
-      );
-    });
-    return JSON.parse(await fs.readFile(jsonPath, "utf8"));
-  } finally {
-    await fs.rm(outputDir, { recursive: true, force: true });
+  uri: string,
+  workflowName?: string
+): Promise<MetroMapResult> {
+  const commands = await vscode.commands.getCommands(true);
+  if (!commands.includes(PREVIEW_DAG_JSON)) {
+    throw new Error(
+      "The Nextflow language server is still starting, or its version does not support the metro map."
+    );
   }
+  return buildMetroMap(uri, cache.fetch, workflowName);
 }

@@ -11,7 +11,7 @@ git clone --recurse-submodules https://github.com/nextflow-io/vscode-language-ne
 cd vscode-language-nextflow
 ```
 
-The [MetroFlow](https://gitlab.pasteur.fr/sharefair/metroflow) metro map viewer and [BioFlow-Insight](https://gitlab.liris.cnrs.fr/sharefair/bioflow-insight), which generates the metro map, are git submodules that are bundled with the extension. In an existing clone, fetch them with `git submodule update --init`, and update them to their latest versions with `git submodule update --remote metroflow bioflow-insight`.
+The [MetroFlow](https://gitlab.pasteur.fr/sharefair/metroflow) metro map viewer is a git submodule that is bundled with the extension. In an existing clone, fetch it with `git submodule update --init`, and update it to its latest version with `git submodule update --remote metroflow`. The metro map itself is built in [src/languageServer/utils/metroMap](src/languageServer/utils/metroMap) from the structure returned by the `nextflow.server.previewDagJson` command of the language server. The webview that shows it is built in [src/languageServer/utils/buildMetroMapPreview.ts](src/languageServer/utils/buildMetroMapPreview.ts): it gives MetroFlow what a webview cannot do itself (saving files, opening code in the editor, keeping the layout of each map) through its `host` and `storage` options. Changes to MetroFlow are committed and pushed in its own repository first, then the new version of the submodule is committed here.
 
 Install dependencies:
 

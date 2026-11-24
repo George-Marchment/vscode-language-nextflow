@@ -1,6 +1,3 @@
 [submodule "metroflow"]
 	path = metroflow
 	url = https://gitlab.pasteur.fr/sharefair/metroflow.git
-[submodule "bioflow-insight"]
-	url = https://gitlab.liris.cnrs.fr/sharefair/bioflow-insight.git
-	path = bioflow-insight

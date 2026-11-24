@@ -302,11 +302,6 @@
           "default": "26.04",
           "markdownDescription": "Nextflow language version to be used by the language server."
         },
-        "nextflow.metroflow.pythonPath": {
-          "type": "string",
-          "default": "python3",
-          "markdownDescription": "Python interpreter used to generate the [MetroFlow](https://gitlab.pasteur.fr/sharefair/metroflow) metro map shown by **Preview metro-map**. [BioFlow-Insight](https://gitlab.liris.cnrs.fr/sharefair/bioflow-insight) is bundled with the extension, but this Python must have its dependencies installed (`graphviz`, `jpype1`, `networkx`, `numpy`, `pandas`, `parsimonious`, `sympy`), and Graphviz must be on the `PATH`. When the metro map cannot be generated, the DAG is shown instead."
-        },
         "nextflow.telemetry.enabled": {
           "type": "boolean",
           "default": false,
@@ -385,6 +380,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",
+    "@hpcc-js/wasm-graphviz": "1.30.0",
     "@types/node": "^20",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
